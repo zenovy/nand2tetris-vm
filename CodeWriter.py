@@ -10,44 +10,26 @@ class CodeWriter:
     def WritePushPop(self, command, segment, index):
         if command = 'C_PUSH':
             self.__writelines__([
-                # Set segment[index] to D register
-                '@{index}',
-                'D=A',
-                '@{segment}',
-                'A=D+A',
+                # 1. Set D = segment[index]*
+                '@{0}'.format(segment + index},
                 'D=M',
-                # Set SP* = D
+                # 2. Set SP* = segment[index]*
                 '@SP',
-                'A=M',
-                'M=D',
-                # Increment SP
+                'A=M', # Set SP address to A
+                'M=D', # Set value at SP to D
+                # 3. Increment SP
                 '@SP',
                 'M=M+1',
             ])
         elif command = 'C_POP':
-            # TODO: Later...
             self.__writelines__([
-                # Set D = SP*
+                # 1. Set D = SP*
                 '@SP',
                 'D=M',
-                # Set segment[index] = D
-                '@{segment}',
-                'D=A',
-
-                ###
-                # Set (segment + index) to D
-                '@{index}',
-                'D=A',
-                '@{segment}',
-                'D=D+A',
-                #
-                '@SP',
-                'A=M',
-                # A = SP*, D = segment + index
-                # Set D -> A, A -> D
-
-
-                # Decrement SP
+                # 2. Set segment[index]* = D
+                '@{0}'.format(segment + index},
+                'M=D',
+                # 3. Decrement SP
                 '@SP',
                 'M=M-1',
             ])
