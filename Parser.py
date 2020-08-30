@@ -1,78 +1,86 @@
 import re
 
+arith_regex = re.compile(r'\b(add|sub|neg|eq|gt|lt|and|or|not)', flags=re.I)
+push_regex = re.compile(r'\bpush(?:\s+(\w+))(?:\s+(\w+))')
+pop_regex = re.compile(r'\bpop(?:\s+(\w+))(?:\s+(\w+))')
+label_regex = re.compile(r'\blabel(?:\s+(\w+))')
+goto_regex = re.compile(r'\bgoto(?:\s+(\w+))')
+if_regex = re.compile(r'\bif-goto(?:\s+(\w+))')
+func_regex = re.compile(r'\bfunction(?:\s+(\w+))(?:\s+(\d+))')
+return_regex = re.compile(r'\breturn\b')
+call_regex = re.compile(r'\bcall(?:\s+(\w+))(?:\s+(\d+))')
+command_type_map = {
+    'C_ARITHMETIC': arith_regex,
+    'C_PUSH': push_regex,
+    'C_POP': pop_regex,
+    'C_LABEL': label_regex,
+    'C_GOTO': goto_regex,
+    'C_IF': if_regex,
+    'C_FUNCTION': func_regex,
+    'C_RETURN': return_regex,
+    'C_CALL': call_regex,
+}
+
+
 class Parser:
-    arith_regex = re.compile(r'\bAdd\b | \bSub\b | \bNeg\b |\b Eq\b | \bGt\b | \bLt\b | \bAnd\b | \bOr\b | \bNot\b', flags=re.I | re.X)
-    push_regex = re.compile(r'\bpush (\w\+) (\w\+)\b')
-    pop_regex = re.compile(r'\bpop (\w\+) (\w\+)\b')
-    label_regex = re.compile(r'\blabel (\w\+)\b') 
-    goto_regex = re.compile(r'\bgoto (\w\+)\b')
-    if_regex = re.compile(r'\bif-goto (\w\+)\b')
-    func_regex = re.compile(r'\bfunction (\w\+) (\d\+)\b')
-    return_regex = re.compile(r'\breturn\b')
-    call_regex = re.compile(r'\bcall (\w\+) (\d\+)\b')
+    def __init__(self, input_stream):
+        self.input_stream = input_stream
+        self.arg1 = None
+        self.arg2 = None
+        self.current_line = None
+        self.is_last_command = False
 
-    command_type_map = {
-            'C_ARITHMETIC': arith_regex,
-            'C_PUSH': push_regex,
-            'C_POP': pop_regex,
-            'C_LABEL': label_regex,
-            'C_GOTO': goto_regex,
-            'C_IF': if_regex,
-            'C_FUNCTION': func_regex,
-            'C_RETURN': return_regex,
-            'C_CALL': call_regex,
-    }
-    def __init__(self, istream):
-        self.istream = istream
-
-    def hasMoreCommands(self):
+    def has_more_commands(self):
         if self.is_last_command:
             return False
-        cur_pos = self.istream.tell()
-        next_line = self.istream.readline()
-        self.istream.seek(cur_pos)
-        if next_line == ''
-          self.is_last_command = True
+        cur_pos = self.input_stream.tell()
+        next_line = self.input_stream.readline()
+        self.input_stream.seek(cur_pos)
+        if next_line == '':
+            self.is_last_command = True
         return True
 
     def advance(self):
-        nextLineRaw = self.file.readline()
-        if nextLineRaw == '':
+        next_line_raw = self.input_stream.readline()
+        if next_line_raw == '':
+            self.is_last_command = True
             self.current_line == ''
             return
-        self.current_line = nextLineRaw.strip()
-        if self.current_line = '':
+        self.current_line = next_line_raw.strip()
+        if self.current_line == '':
+            print('B')
             self.advance()
 
         for command, regex in command_type_map.items():
             result = regex.search(self.current_line)
             if result:
+                print(self.current_line)
+                self.command = command
                 groups = result.groups()
                 self.arg1 = None
                 self.arg2 = None
 
                 # Get 1st Arg (in arithmetic case, the operation)
-                if command == 'C_ARITHMETIC':
-                    self.arg1 = groups[0]
-                elif command = 'C_RETURN':
-                    pass
+                if command == 'C_RETURN':
+                    if self.arg1:
+                        raise Exception('Extra argument passed into return statement: `{}`'.format(self.current_line))
                 else:
-                    self.arg1 = groups[1]
+                    self.arg1 = groups[0]
 
                 # Get 2nd Arg (for applicable commands)
                 if command in ('C_PUSH', 'C_POP', 'C_FUNCTION', 'C_CALL'):
-                    self.arg2 = groups[2]
+                    self.arg2 = groups[1]
+                elif self.arg2:
+                    raise Exception('Extra argument passed into line `{}`'.format(self.current_line))
 
                 # Exit out of loop
                 break
 
-    def commandType(self):
-
-        #C_ARITHMETIC, C_PUSH, C_POP, C_LABEL, C_GOTO, C_IF, C_FUNCTION, C_RETURN, C_CALL
-
-        pass
+    def command_type(self):
+        return self.command
 
     def arg1(self):
         return self.arg1
+
     def arg2(self):
         return self.arg2
