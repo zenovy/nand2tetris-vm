@@ -1,86 +1,56 @@
 import re
 
-arith_regex = re.compile(r'\b(add|sub|neg|eq|gt|lt|and|or|not)', flags=re.I)
-push_regex = re.compile(r'\bpush(?:\s+(\w+))(?:\s+(\w+))')
-pop_regex = re.compile(r'\bpop(?:\s+(\w+))(?:\s+(\w+))')
-label_regex = re.compile(r'\blabel(?:\s+(\w+))')
-goto_regex = re.compile(r'\bgoto(?:\s+(\w+))')
-if_regex = re.compile(r'\bif-goto(?:\s+(\w+))')
-func_regex = re.compile(r'\bfunction(?:\s+(\w+))(?:\s+(\d+))')
-return_regex = re.compile(r'\breturn\b')
-call_regex = re.compile(r'\bcall(?:\s+(\w+))(?:\s+(\d+))')
-command_type_map = {
-    'C_ARITHMETIC': arith_regex,
-    'C_PUSH': push_regex,
-    'C_POP': pop_regex,
-    'C_LABEL': label_regex,
-    'C_GOTO': goto_regex,
-    'C_IF': if_regex,
-    'C_FUNCTION': func_regex,
-    'C_RETURN': return_regex,
-    'C_CALL': call_regex,
+from typing import IO, Tuple
+from VMTypes import CommandType
+
+command_type_regex_map = {
+    CommandType.ADD: (re.compile(r"^(add)", flags=re.I)),
+    CommandType.SUB: (re.compile(r"^(sub)", flags=re.I)),
+    CommandType.NEG: (re.compile(r"^(neg)", flags=re.I)),
+    CommandType.EQ: (re.compile(r"^(eq)", flags=re.I)),
+    CommandType.GT: (re.compile(r"^(gt)", flags=re.I)),
+    CommandType.LT: (re.compile(r"^(lt)", flags=re.I)),
+    CommandType.AND: (re.compile(r"^(and)", flags=re.I)),
+    CommandType.OR: (re.compile(r"^(or)", flags=re.I)),
+    CommandType.NOT: (re.compile(r"^(not)", flags=re.I)),
+    CommandType.PUSH: (re.compile(r"^push(?:\s+(\w+))(?:\s+(\w+))")),
+    CommandType.POP: (re.compile(r"^pop(?:\s+(\w+))(?:\s+(\w+))")),
+    CommandType.LABEL: (re.compile(r"^label(?:\s+(\w+))")),
+    CommandType.GOTO: (re.compile(r"^goto(?:\s+(\w+))")),
+    CommandType.IF: (re.compile(r"^if-goto(?:\s+(\w+))")),
+    CommandType.FUNCTION: (re.compile(r"^function(?:\s+(\w+))(?:\s+(\d+))")),
+    CommandType.RETURN: (re.compile(r"^return\b")),
+    CommandType.CALL: (re.compile(r"^call(?:\s+(\w+))(?:\s+(\d+))")),
 }
 
 
-class Parser:
-    def __init__(self, input_stream):
-        self.input_stream = input_stream
-        self.arg1 = None
-        self.arg2 = None
-        self.current_line = None
-        self.is_last_command = False
+class ParsingError(RuntimeError):
+    pass
 
-    def has_more_commands(self):
-        if self.is_last_command:
-            return False
-        cur_pos = self.input_stream.tell()
-        next_line = self.input_stream.readline()
-        self.input_stream.seek(cur_pos)
-        if next_line == '':
-            self.is_last_command = True
-        return True
 
-    def advance(self):
-        next_line_raw = self.input_stream.readline()
-        if next_line_raw == '':
-            self.is_last_command = True
-            self.current_line == ''
-            return
-        self.current_line = next_line_raw.strip()
-        if self.current_line == '':
-            print('B')
-            self.advance()
+def parse_commands(input_stream: IO) -> Tuple[CommandType, str, str]:
+    for line in input_stream:
+        if line == "":  # EOF
+            return None
+        for command_type, regex in command_type_regex_map.items():
+            result = regex.search(line)
+            if not result or line.strip() == "":
+                continue  # Line can be ignored (e.g. a comment) or malformed line. TODO: detect input errors
+            args = result.groups()  # Skip the first group, which is just the whole expression
+            assert len(args) < 3
+            print(f"{line}: {str(command_type)} + {','.join(args)} # {len(args)}")
+            # arg1, arg2 = groups
 
-        for command, regex in command_type_map.items():
-            result = regex.search(self.current_line)
-            if result:
-                print(self.current_line)
-                self.command = command
-                groups = result.groups()
-                self.arg1 = None
-                self.arg2 = None
+            # Check that `return` command has no arguments
+            if len(args) > 0 and command_type == CommandType.RETURN:
+                raise ParsingError(f"Extra argument passed into return statement: `{line}`")
 
-                # Get 1st Arg (in arithmetic case, the operation)
-                if command == 'C_RETURN':
-                    if self.arg1:
-                        raise Exception('Extra argument passed into return statement: `{}`'.format(self.current_line))
-                else:
-                    self.arg1 = groups[0]
+            # Check that unary commands have only one argument
+            if len(args) > 1 and command_type not in (CommandType.PUSH, CommandType.POP, CommandType.FUNCTION, CommandType.CALL):
+                raise ParsingError(f"Extra argument passed into line `{line}`")
+            arg1 = result.group(1) if len(args) > 0 else None
+            arg2 = result.group(2) if len(args) > 1 else None
+            print(arg1, arg2)
 
-                # Get 2nd Arg (for applicable commands)
-                if command in ('C_PUSH', 'C_POP', 'C_FUNCTION', 'C_CALL'):
-                    self.arg2 = groups[1]
-                elif self.arg2:
-                    raise Exception('Extra argument passed into line `{}`'.format(self.current_line))
-
-                # Exit out of loop
-                break
-
-    def command_type(self):
-        return self.command
-
-    def arg1(self):
-        return self.arg1
-
-    def arg2(self):
-        return self.arg2
+            yield command_type, arg1, arg2
+            break  # Exit out of inner loop for the next command

@@ -1,29 +1,29 @@
-from sys import argv
 from CodeWriter import CodeWriter
-from Parser import Parser
+from Parser import parse_commands
+from argparse import ArgumentParser
+from contextlib import ExitStack
+from typing import IO
 
-filename = argv[1]
-output_filename = argv[2]
+# Get the filename from the "--filename" argument
+arg_parser = ArgumentParser()
+arg_parser.add_argument(
+    "--input_file",
+    help=f"Name of the .vm file to translate",
+    required=True,
+)
+args = arg_parser.parse_args()
+filename = args.input_file
 
-# Open files
-f = open(filename)
-output_file = open(output_filename + '.asm', 'w')
 
-parser = Parser(f)
-codeWriter = CodeWriter(output_file)
+def run():
+    with ExitStack() as exit_stack:
+        input_file: IO = exit_stack.enter_context(open(filename))
+        output_file: IO = exit_stack.enter_context(open(filename.rstrip("vm") + "asm", "w"))
+        code_writer = CodeWriter(output_file)
 
-while parser.has_more_commands():
-    parser.advance()
-    command_type = parser.command_type()
-    arg1 = parser.arg1
-    arg2 = parser.arg2
-    if command_type == 'C_PUSH' or command_type == 'C_POP':
-        codeWriter.write_push_pop(command_type, arg1, arg2)
-    elif command_type == 'C_ARITHMETIC':
-        codeWriter.write_arithmetic(arg1)
-    else:
-        raise Exception("Command type '{0}' not implemented yet".format(command_type))
+        for command_type, arg1, arg2 in parse_commands(input_file):
+            code_writer.write_command(command_type, arg1, arg2)
 
-# Close files
-f.close()
-codeWriter.close()
+
+if __name__ == "__main__":
+    run()
