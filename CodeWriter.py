@@ -63,15 +63,6 @@ class CodeWriter:
         self.output_stream = output_stream
         self.filename = filename
         self.count = 0
-        """
-        self._write_lines([
-            # Initialize stack pointer
-            "@256",
-            "D=A",
-            "@0",
-            "A=D",
-        ])
-        """
 
     def _write_lines(self, lines: List[str]):
         for line in lines:
@@ -141,92 +132,95 @@ class CodeWriter:
         else:
             raise RuntimeError(f"Command {command_type} not recognized")
 
-    def write_push_pop(self, command: CommandType, segment_name: str, index):
+    def _write_push(self, segment_name: str, index):
         index = int(index)
         segment = Segment[segment_name]
         segment_start = segment.value
-        if command == CommandType.PUSH:
-            if segment == Segment.constant:
-                self._write_lines([
-                    # Set D = index
-                    f"@{index}",
-                    "D=A",
-                ])
-            elif segment == Segment.static:
-                self._write_lines([
-                    f"@{self.filename}.{index}",
-                    "D=M",
-                ])
-            elif segment.is_number():
-                self._write_lines([
-                    f"@{segment_start + index}",
-                    "D=M",
-                ])
-            elif segment.is_symbol():
-                self._write_lines([
-                    # Get value from segment
-                    f"@{index}",
-                    "D=A",
-                    f"@{segment_start}",
-                    "A=D+M",
-                    "D=M",
-                ])
-            else:
-                raise RuntimeError(f"SegmentType {segment_name} not implemented yet")
+        if segment == Segment.constant:
             self._write_lines([
-                # Push D on top of stack and increment SP
-                "@SP",
-                "A=M",
-                "M=D",
-                "@SP",
-                "M=M+1",
+                # Set D = index
+                f"@{index}",
+                "D=A",
             ])
-        elif command == CommandType.POP:
-            if segment == Segment.constant:
-                raise RuntimeError("Cannot pop into constant segment")
-            elif segment == Segment.static:
-                self._write_lines([
-                    f"@{self.filename}.{index}",
-                    "D=A",
-                ])
-            elif segment.is_number():
-                # pointer and temp segments are in RAM[3-4] and RAM[5-12], respectively
-                # TODO assert index (temp index < 8, pointer index < 2)
-                self._write_lines([
-                    f"@{segment_start + index}",
-                    "D=A",
-                ])
-            elif segment.is_symbol():
-                # local, argument, this, and that segments are pointers to that segment's base address
-                self._write_lines([
-                    f"@{segment_start}",  # points to base
-                    "D=M",
-                    f"@{index}",
-                    "D=D+A",
-                ])
-            else:
-                raise RuntimeError(f"SegmentType {segment_name} not implemented yet")
+        elif segment == Segment.static:
             self._write_lines([
-                # Store the destination address in register 15
-                "@15",
-                "M=D",
-                # Decrement stack pointer and set D to top of stack
-                "@SP",
-                "M=M-1",
-                "@SP",
-                "A=M",
+                f"@{self.filename}.{index}",
                 "D=M",
-                # Get destination address from register and load D
-                "@15",
-                "A=M",
-                "M=D",
+            ])
+        elif segment.is_number():
+            self._write_lines([
+                f"@{segment_start + index}",
+                "D=M",
+            ])
+        elif segment.is_symbol():
+            self._write_lines([
+                # Get value from segment
+                f"@{index}",
+                "D=A",
+                f"@{segment_start}",
+                "A=D+M",
+                "D=M",
             ])
         else:
-            raise RuntimeError("Command {} is not a valid command.".format(command))
+            raise RuntimeError(f"SegmentType {segment_name} is not a valid segment")
+        self._write_lines([
+            # Push D on top of stack and increment SP
+            "@SP",
+            "A=M",
+            "M=D",
+            "@SP",
+            "M=M+1",
+        ])
+
+    def _write_pop(self, segment_name: str, index):
+        index = int(index)
+        segment = Segment[segment_name]
+        segment_start = segment.value
+        if segment == Segment.constant:
+            raise RuntimeError("Cannot pop into constant segment")
+        elif segment == Segment.static:
+            self._write_lines([
+                f"@{self.filename}.{index}",
+                "D=A",
+            ])
+        elif segment.is_number():
+            # pointer and temp segments are in RAM[3-4] and RAM[5-12], respectively
+            # TODO assert index (temp index < 8, pointer index < 2)
+            self._write_lines([
+                f"@{segment_start + index}",
+                "D=A",
+            ])
+        elif segment.is_symbol():
+            # local, argument, this, and that segments are pointers to that segment's base address
+            self._write_lines([
+                f"@{segment_start}",  # points to base
+                "D=M",
+                f"@{index}",
+                "D=D+A",
+            ])
+        else:
+            raise RuntimeError(f"SegmentType {segment_name} is not a valid segment")
+        self._write_lines([
+            # Store the destination address in register 15
+            "@15",
+            "M=D",
+            # Decrement stack pointer and set D to top of stack
+            "@SP",
+            "M=M-1",
+            "@SP",
+            "A=M",
+            "D=M",
+            # Get destination address from register and load D
+            "@15",
+            "A=M",
+            "M=D",
+        ])
 
     def write_command(self, command_type: CommandType, arg1: str, arg2: str):
-        if command_type in (CommandType.PUSH, CommandType.POP):
-            self.write_push_pop(command_type, arg1, arg2)
+        if command_type == CommandType.PUSH:
+            self._write_push(arg1, arg2)
+        elif command_type == CommandType.POP:
+            self._write_pop(arg1, arg2)
         elif command_type.is_arithmetic():
             self.write_arithmetic(command_type)
         else:
