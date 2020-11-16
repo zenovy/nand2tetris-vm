@@ -1,11 +1,11 @@
 from typing import IO, List
 
-from VMTypes import CommandType
+from VMTypes import CommandType, Segment
 
 
 # Sets D to *y and A to &x
 SET_BINARY_REGS = [
-    "@0",
+    "@SP",
     "A=M-1",  # A = (SP)* - 1, or A = &y
     "D=M",   # D = *y
     "A=A-1",  # A = (SP)* - 2, or A = &x
@@ -13,13 +13,13 @@ SET_BINARY_REGS = [
 
 # Sets A to &x
 UNARY_SETUP = [
-    "@0",
+    "@SP",
     "A=M-1",
 ]
 
 # Sets SP* to SP* - 1
 DECREMENT_SP = [
-    "@0",
+    "@SP",
     "M=M-1",  # SP = SP - 1
 ]
 
@@ -75,6 +75,7 @@ class CodeWriter:
     def _write_lines(self, lines: List[str]):
         for line in lines:
             self.output_stream.write(f"{line}\n")
+            print(line)
 
     def write_arithmetic(self, command_type: CommandType):
         if command_type == CommandType.ADD:
@@ -107,7 +108,7 @@ class CodeWriter:
                     "D=-1",
                     # Finally branch
                     f"(CMP{jmp_label}END)",
-                    "@0",
+                    "@SP",
                     "A=M-1",
                     "A=A-1",
                     "M=D",
@@ -139,48 +140,75 @@ class CodeWriter:
         else:
             raise RuntimeError(f"Command {command_type} not recognized")
 
-    def write_push_pop(self, command: CommandType, segment: str, index):
-        """
-        if segment == "argument":
-            pass
-        if segment == "local":
-            pass
-        if segment == "this":
-            pass
-        if segment == "that":
-            pass
-        """
-        if segment == "static":
-            segment_start = 16
-        elif segment == "constant":
-            # If we set segment at 0, we can load constant with consecutive @{constant} and D=A
-            segment_start = 0
-        else:
-            raise RuntimeError(f"Segment {segment} not implemented yet")
+    def write_push_pop(self, command: CommandType, segment_name: str, index):
+        index = int(index)
+        segment = Segment[segment_name]
+        segment_start = segment.value
         if command == CommandType.PUSH:
+            if segment == Segment.constant:
+                self._write_lines([
+                    # Set D = index
+                    f"@{index}",
+                    "D=A",
+                ])
+            elif segment.is_number():
+                self._write_lines([
+                    f"@{segment_start + index}",
+                    "D=M",
+                ])
+            elif segment.is_symbol():
+                self._write_lines([
+                    # Get value from segment
+                    f"@{index}",
+                    "D=A",
+                    f"@{segment_start}",
+                    "A=D+M",
+                    "D=M",
+                ])
+            else:
+                raise RuntimeError(f"SegmentType {segment_name} not implemented yet")
             self._write_lines([
-                # 1. Set D = segment[index]*
-                "@{0}".format(segment_start + int(index)),
-                "D=A" if segment == "constant" else "D=M",
-                # 2. Set SP* = segment[index]*
-                "@0",
-                "A=M",  # Set SP address to A
-                "M=D",  # Set value at SP to D
-                # 3. Increment SP
-                "@0",
+                # Push D on top of stack and increment SP
+                "@SP",
+                "A=M",
+                "M=D",
+                "@SP",
                 "M=M+1",
             ])
         elif command == CommandType.POP:
+            if segment == Segment.constant:
+                raise RuntimeError("Cannot pop into constant segment")
+            elif segment.is_number():
+                # pointer and temp segments are in RAM[3-4] and RAM[5-12], respectively
+                # TODO assert index (temp index < 8, pointer index < 2)
+                self._write_lines([
+                    f"@{segment_start + index}",
+                    "D=A",
+                ])
+            elif segment.is_symbol():
+                # local, argument, this, and that segments are pointers to that segment's base address
+                self._write_lines([
+                    f"@{segment_start}",  # points to base
+                    "D=M",
+                    f"@{index}",
+                    "D=D+A",
+                ])
+            else:
+                raise RuntimeError(f"SegmentType {segment_name} not implemented yet")
             self._write_lines([
-                # 1. Set D = SP*
-                "@0",
-                "D=M",
-                # 2. Set segment[index]* = D
-                "@{0}".format(segment_start + index),
+                # Store the destination address in register 15
+                "@15",
                 "M=D",
-                # 3. Decrement SP
-                "@0",
+                # Decrement stack pointer and set D to top of stack
+                "@SP",
                 "M=M-1",
+                "@SP",
+                "A=M",
+                "D=M",
+                # Get destination address from register and load D
+                "@15",
+                "A=M",
+                "M=D",
             ])
         else:
             raise RuntimeError("Command {} is not a valid command.".format(command))

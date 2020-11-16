@@ -22,3 +22,23 @@ class CommandType(Enum):
 
     def is_arithmetic(self):
         return self in (self.ADD, self.SUB, self.NEG, self.EQ, self.GT, self.LT, self.AND, self.OR, self.NOT)
+
+
+class Segment(Enum):
+    constant = None
+    local = "LCL"
+    argument = "ARG"
+    this = "THIS"
+    that = "THAT"
+    pointer = 3
+    temp = 5
+
+    def is_symbol(self):
+        return self == self.local or self == self.argument or self == self.this or self == self.that
+
+    def is_number(self):
+        return self == self.pointer or self == self.temp
+
+    """
+    static
+    """

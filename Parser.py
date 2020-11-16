@@ -38,7 +38,7 @@ def parse_commands(input_stream: IO) -> Tuple[CommandType, str, str]:
                 continue  # Line can be ignored (e.g. a comment) or malformed line. TODO: detect input errors
             args = result.groups()  # Skip the first group, which is just the whole expression
             assert len(args) < 3
-            print(f"{line}: {str(command_type)} + {','.join(args)} # {len(args)}")
+            print(f"\n{line}{str(command_type)} + {','.join(args)}")
             # arg1, arg2 = groups
 
             # Check that `return` command has no arguments
