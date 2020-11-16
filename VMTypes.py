@@ -25,20 +25,17 @@ class CommandType(Enum):
 
 
 class Segment(Enum):
-    constant = None
+    static = None
+    constant = 0
+    pointer = 3
+    temp = 5
     local = "LCL"
     argument = "ARG"
     this = "THIS"
     that = "THAT"
-    pointer = 3
-    temp = 5
 
     def is_symbol(self):
         return self == self.local or self == self.argument or self == self.this or self == self.that
 
     def is_number(self):
         return self == self.pointer or self == self.temp
-
-    """
-    static
-    """

@@ -59,8 +59,9 @@ SEGMENT_TABLE = {
 
 
 class CodeWriter:
-    def __init__(self, output_stream: IO):
+    def __init__(self, filename: str, output_stream: IO):
         self.output_stream = output_stream
+        self.filename = filename
         self.count = 0
         """
         self._write_lines([
@@ -151,6 +152,11 @@ class CodeWriter:
                     f"@{index}",
                     "D=A",
                 ])
+            elif segment == Segment.static:
+                self._write_lines([
+                    f"@{self.filename}.{index}",
+                    "D=M",
+                ])
             elif segment.is_number():
                 self._write_lines([
                     f"@{segment_start + index}",
@@ -178,6 +184,11 @@ class CodeWriter:
         elif command == CommandType.POP:
             if segment == Segment.constant:
                 raise RuntimeError("Cannot pop into constant segment")
+            elif segment == Segment.static:
+                self._write_lines([
+                    f"@{self.filename}.{index}",
+                    "D=A",
+                ])
             elif segment.is_number():
                 # pointer and temp segments are in RAM[3-4] and RAM[5-12], respectively
                 # TODO assert index (temp index < 8, pointer index < 2)
