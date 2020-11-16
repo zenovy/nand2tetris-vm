@@ -204,7 +204,7 @@ class CodeWriter:
             # Store the destination address in register 15
             "@15",
             "M=D",
-            # Decrement stack pointer and set D to top of stack
+            # Decrement stack pointer and set D from top of stack
             "@SP",
             "M=M-1",
             "@SP",
@@ -216,12 +216,40 @@ class CodeWriter:
             "M=D",
         ])
 
+    def _write_label(self, label_name: str):
+        self._write_lines([
+            f"({label_name})",
+        ])
+
+    def _write_goto(self, dest: str):
+        self._write_lines([
+            f"@{dest}",
+            "0;JMP",
+        ])
+
+    def _write_if_goto(self, dest: str):
+        self._write_lines([
+            "@SP",
+            "M=M-1",
+            "@SP",
+            "A=M",
+            "D=M",
+            f"@{dest}",
+            "D;JNE",
+        ])
+
     def write_command(self, command_type: CommandType, arg1: str, arg2: str):
-        if command_type == CommandType.PUSH:
+        if command_type.is_arithmetic():
+            self.write_arithmetic(command_type)
+        elif command_type == CommandType.PUSH:
             self._write_push(arg1, arg2)
         elif command_type == CommandType.POP:
             self._write_pop(arg1, arg2)
-        elif command_type.is_arithmetic():
-            self.write_arithmetic(command_type)
+        elif command_type == CommandType.LABEL:
+            self._write_label(arg1)
+        elif command_type == CommandType.GOTO:
+            self._write_goto(arg1)
+        elif command_type == CommandType.IF_GOTO:
+            self._write_if_goto(arg1)
         else:
             raise RuntimeError(f"Command type '{command_type}' not implemented yet")

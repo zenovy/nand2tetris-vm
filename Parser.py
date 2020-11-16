@@ -17,7 +17,7 @@ command_type_regex_map = {
     CommandType.POP: (re.compile(r"^pop(?:\s+(\w+))(?:\s+(\w+))")),
     CommandType.LABEL: (re.compile(r"^label(?:\s+(\w+))")),
     CommandType.GOTO: (re.compile(r"^goto(?:\s+(\w+))")),
-    CommandType.IF: (re.compile(r"^if-goto(?:\s+(\w+))")),
+    CommandType.IF_GOTO: (re.compile(r"^if-goto(?:\s+(\w+))")),
     CommandType.FUNCTION: (re.compile(r"^function(?:\s+(\w+))(?:\s+(\d+))")),
     CommandType.RETURN: (re.compile(r"^return\b")),
     CommandType.CALL: (re.compile(r"^call(?:\s+(\w+))(?:\s+(\d+))")),

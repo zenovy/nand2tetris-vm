@@ -15,7 +15,7 @@ class CommandType(Enum):
     POP = "pop"
     LABEL = "label"
     GOTO = "goto"
-    IF = "if-goto"
+    IF_GOTO = "if-goto"
     FUNCTION = "function"
     RETURN = "return"
     CALL = "call"
